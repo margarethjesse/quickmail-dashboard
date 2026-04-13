@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quickmail Replies Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg:#1c1c1a; --bg2:#252523; --bg3:#141412;
+    --text:#f0ede8; --text2:#a0a09a; --text3:#606060;
+    --border:rgba(255,255,255,0.09); --border2:rgba(255,255,255,0.15);
+    --green:#97C459; --green-dark:#3B6D11; --green-light:rgba(59,109,17,0.25);
+    --blue:#85B7EB; --red:#F09595; --amber:#FAC775; --purple:#AFA9EC;
+    --radius:8px; --radius-lg:12px;
+  }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg3); color: var(--text); min-height: 100vh; }
+  .app { max-width: 1100px; margin: 0 auto; padding: 24px 20px; }
+
+  .loading { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 80vh; gap: 16px; }
+  .spinner { width: 36px; height: 36px; border: 3px solid var(--border); border-top-color: var(--green); border-radius: 50%; animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loading-text { font-size: 14px; color: var(--text2); }
+
+  .error-box { background: rgba(240,149,149,0.1); border: 0.5px solid var(--red); border-radius: var(--radius-lg); padding: 20px; font-size: 13px; color: var(--red); max-width: 500px; margin: 0 auto; text-align: center; }
+  .error-box strong { display: block; font-size: 15px; margin-bottom: 8px; }
+
+  .dashboard { display: none; }
+  .header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 20px; flex-wrap: wrap; gap: 12px; }
+  .header h1 { font-size: 22px; font-weight: 600; }
+  .header p { font-size: 13px; color: var(--text2); margin-top: 3px; }
+  .header-right { display: flex; align-items: center; gap: 8px; }
+  .badge { background: var(--green-light); color: var(--green); border: 0.5px solid var(--green-dark); border-radius: 99px; padding: 4px 12px; font-size: 12px; font-weight: 500; }
+  .btn { padding: 7px 14px; border-radius: var(--radius); font-size: 13px; cursor: pointer; background: var(--bg2); color: var(--text); border: 0.5px solid var(--border2); }
+  .btn:hover { background: var(--bg3); }
+  .ts { font-size: 11px; color: var(--text3); }
+
+  .filters { background: var(--bg); border: 0.5px solid var(--border); border-radius: var(--radius-lg); padding: 14px 16px; margin-bottom: 20px; display: flex; flex-wrap: wrap; gap: 16px; align-items: center; }
+  .fg { display: flex; align-items: center; gap: 8px; }
+  .fg label { font-size: 12px; color: var(--text2); white-space: nowrap; }
+  select, input[type=date] { font-size: 13px; padding: 6px 10px; border-radius: var(--radius); border: 0.5px solid var(--border2); background: var(--bg2); color: var(--text); outline: none; }
+  .dv { width: 1px; height: 24px; background: var(--border); }
+  .yb { padding: 5px 12px; border-radius: var(--radius); font-size: 12px; cursor: pointer; background: var(--bg2); color: var(--text2); border: 0.5px solid var(--border); user-select: none; display: inline-block; margin-right: 4px; }
+  .yb.active { background: var(--green-dark); color: #fff; border-color: var(--green-dark); }
+
+  .stats { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; margin-bottom: 20px; }
+  .stat { background: var(--bg); border: 0.5px solid var(--border); border-radius: var(--radius-lg); padding: 14px 16px; }
+  .sl { font-size: 12px; color: var(--text2); margin-bottom: 6px; }
+  .sv { font-size: 26px; font-weight: 600; }
+  .sv.g { color: var(--green); } .sv.r { color: var(--red); }
+  .ss { font-size: 11px; color: var(--text3); margin-top: 3px; }
+
+  .tabs { display: flex; border-bottom: 1px solid var(--border); margin-bottom: 20px; }
+  .tab { padding: 10px 18px; font-size: 13px; cursor: pointer; color: var(--text2); border-bottom: 2px solid transparent; user-select: none; }
+  .tab.active { color: var(--green); border-bottom-color: var(--green); font-weight: 500; }
+  .tc { display: none; } .tc.active { display: block; }
+
+  .g2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .full { grid-column: 1/-1; }
+  .card { background: var(--bg); border: 0.5px solid var(--border); border-radius: var(--radius-lg); padding: 16px; }
+  .ct { font-size: 13px; font-weight: 500; margin-bottom: 14px; }
+  .leg { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+  .li { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--text2); }
+  .ld { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+
+  @media(max-width:700px) {
+    .stats { grid-template-columns: repeat(2,1fr); }
+    .g2 { grid-template-columns: 1fr; }
+    .full { grid-column: 1; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="loading" id="loading">
+    <div class="spinner"></div>
+    <div class="loading-text">Loading your data from Google Sheets...</div>
+  </div>
+
+  <div id="error-area"></div>
+
+  <div class="dashboard" id="dashboard">
+    <div class="header">
+      <div>
+        <h1>Quickmail Replies Dashboard</h1>
+        <p id="sub">Julia-tagged prospects</p>
+      </div>
+      <div class="header-right">
+        <span class="ts" id="ts"></span>
+        <button class="btn" onclick="fetchData()">Refresh</button>
+        <span class="badge">Live</span>
+      </div>
+    </div>
+
+    <div class="filters">
+      <div class="fg"><label>Niche</label><select id="nf"></select></div>
+      <div class="dv"></div>
+      <div class="fg"><label>Year</label><div id="ybs"></div></div>
+      <div class="dv"></div>
+      <div class="fg">
+        <label>Custom range</label>
+        <input type="date" id="sd">
+        <span style="font-size:12px;color:var(--text2)">to</span>
+        <input type="date" id="ed">
+      </div>
+    </div>
+
+    <div class="stats">
+      <div class="stat"><div class="sl">Total replies</div><div class="sv" id="st">—</div><div class="ss">in selected range</div></div>
+      <div class="stat"><div class="sl">Wins</div><div class="sv g" id="sw">—</div><div class="ss">interested + booking</div></div>
+      <div class="stat"><div class="sl">Win rate</div><div class="sv" id="swr">—</div><div class="ss">of all replies</div></div>
+      <div class="stat"><div class="sl">Losses</div><div class="sv r" id="sl2">—</div><div class="ss">not interested + unsub</div></div>
+    </div>
+
+    <div class="tabs">
+      <div class="tab active" data-tab="ov">Overview</div>
+      <div class="tab" data-tab="cp">Campaigns</div>
+      <div class="tab" data-tab="sq">Sequences</div>
+      <div class="tab" data-tab="co">Companies</div>
+    </div>
+
+    <div id="ov" class="tc active">
+      <div class="g2">
+        <div class="card"><div class="ct">Replies over time</div><canvas id="c-tl" height="180"></canvas></div>
+        <div class="card"><div class="ct">Reply type breakdown</div><canvas id="c-pi" height="180"></canvas><div class="leg" id="pl"></div></div>
+        <div class="card full"><div class="ct">Win / loss ratio over time</div><canvas id="c-wl" height="160"></canvas></div>
+      </div>
+    </div>
+    <div id="cp" class="tc"><div class="card"><div class="ct">Top campaigns by wins</div><canvas id="c-cp" height="300"></canvas></div></div>
+    <div id="sq" class="tc"><div class="card"><div class="ct">Top sequences by wins</div><canvas id="c-sq" height="300"></canvas></div></div>
+    <div id="co" class="tc"><div class="card"><div class="ct">Reply volume by company</div><canvas id="c-co" height="300"></canvas></div></div>
+  </div>
+</div>
+
+<script>
+const CSV_URL = "https://corsproxy.io/?" + encodeURIComponent("https://docs.google.com/spreadsheets/d/e/2PACX-1vT7PNMD-7yUtwEjcqy0VwDxsxSSSQ-nDReuGWBvaZWW3nyhqq6zCMt27vyBRoE0oAQ2Hhs2XUFce5zW/pub?gid=252586242&single=true&output=csv");
+const WIN=["interested","booking request"], LOSS=["not interested","unsubscribe request"];
+const TC={"interested":"#97C459","not interested":"#F09595","wants more information":"#FAC775","booking request":"#85B7EB","unsubscribe request":"#606060"};
+const TT={backgroundColor:"#252523",borderColor:"rgba(255,255,255,0.1)",borderWidth:1,titleColor:"#f0ede8",bodyColor:"#a0a09a",padding:10,titleFont:{size:12},bodyFont:{size:11}};
+let DATA=[], ch={}, ay="All", uc=false;
+
+async function fetchData() {
+  document.getElementById("loading").style.display="flex";
+  document.getElementById("dashboard").style.display="none";
+  document.getElementById("error-area").innerHTML="";
+  try {
+    const res = await fetch(CSV_URL);
+    if (!res.ok) throw new Error("Could not fetch data. Status: " + res.status);
+    const text = await res.text();
+    Papa.parse(text, {
+      header: false,
+      skipEmptyLines: true,
+      complete: function(results) {
+        const rows = results.data;
+        // Find header row
+        let hi = 0;
+        for (let i = 0; i < Math.min(5, rows.length); i++) {
+          if (rows[i].some(c => /campaign|niche|prospect email/i.test(String(c)))) { hi = i; break; }
+        }
+        const hdr = rows[hi].map(h => String(h).toLowerCase().trim());
+        const col = n => hdr.findIndex(h => h.includes(n));
+        const iN = col("niche") !== -1 ? col("niche") : col("campaign");
+        const iE = col("prospect email") !== -1 ? col("prospect email") : col("email");
+        const iT = col("job title") !== -1 ? col("job title") : col("job");
+        const iD = col("date replied") !== -1 ? col("date replied") : col("date");
+        const iS = col("email sequence") !== -1 ? col("email sequence") : col("sequence");
+        const iC = col("company");
+        const iB = col("full reply") !== -1 ? col("full reply") : col("reply body") !== -1 ? col("reply body") : col("body");
+        const iR = col("reply type") !== -1 ? col("reply type") : col("type");
+
+        DATA = rows.slice(hi + 1)
+          .filter(r => r[iD] && String(r[iD]).match(/\d{4}/))
+          .map(r => ({
+            niche:     String(r[iN]||"").trim(),
+            email:     String(r[iE]||"").trim(),
+            title:     String(r[iT]||"").trim(),
+            date:      String(r[iD]||"").trim().slice(0,10),
+            sequence:  String(r[iS]||"").trim(),
+            company:   String(r[iC]||"").trim(),
+            body:      String(r[iB]||"").trim(),
+            replyType: String(r[iR]||"").trim().toLowerCase(),
+          }))
+          .filter(r => r.date.match(/^\d{4}-\d{2}-\d{2}/));
+
+        initDashboard();
+      }
+    });
+  } catch(e) {
+    document.getElementById("loading").style.display="none";
+    document.getElementById("error-area").innerHTML='<div class="error-box"><strong>Could not load data</strong>'+e.message+'<br><br>Make sure your Google Sheet is published as CSV and the URL is correct.</div>';
+  }
+}
+
+function initDashboard() {
+  document.getElementById("loading").style.display="none";
+  document.getElementById("dashboard").style.display="block";
+  document.getElementById("ts").textContent="Updated "+new Date().toLocaleTimeString();
+
+  const niches=["All",...new Set(DATA.map(d=>d.niche).filter(Boolean))];
+  const ns=document.getElementById("nf");
+  ns.innerHTML=niches.map(n=>'<option value="'+n+'">'+(n||"(none)")+"</option>").join("");
+  ns.onchange=render;
+
+  const yrs=["All",...[...new Set(DATA.map(d=>d.date.slice(0,4)).filter(Boolean))].sort()];
+  const ybs=document.getElementById("ybs");
+  ybs.innerHTML="";
+  yrs.forEach(y=>{
+    const b=document.createElement("span");
+    b.className="yb"+(y==="All"?" active":"");
+    b.textContent=y;
+    b.onclick=()=>{ay=y;uc=false;document.querySelectorAll(".yb").forEach(x=>x.classList.remove("active"));b.classList.add("active");render();};
+    ybs.appendChild(b);
+  });
+
+  const dates=DATA.map(d=>d.date).filter(Boolean).sort();
+  document.getElementById("sd").value=dates[0]||"";
+  document.getElementById("ed").value=dates[dates.length-1]||"";
+  document.getElementById("sd").oninput=()=>{uc=true;document.querySelectorAll(".yb").forEach(x=>x.classList.remove("active"));render();};
+  document.getElementById("ed").oninput=()=>{uc=true;document.querySelectorAll(".yb").forEach(x=>x.classList.remove("active"));render();};
+
+  ay="All"; uc=false;
+  render();
+}
+
+function gf(){
+  const n=document.getElementById("nf").value;
+  const s=document.getElementById("sd").value;
+  const e=document.getElementById("ed").value;
+  return DATA.filter(d=>{
+    if(n!=="All"&&d.niche!==n)return false;
+    if(uc&&s&&e)return d.date>=s&&d.date<=e;
+    if(!uc&&ay!=="All")return d.date.startsWith(ay);
+    return true;
+  });
+}
+
+function gb(arr,k){const m={};arr.forEach(d=>{const v=d[k]||"(none)";m[v]=(m[v]||0)+1;});return m;}
+function dc(id){if(ch[id]){ch[id].destroy();delete ch[id];}}
+
+function render(){
+  const d=gf(), t=d.length;
+  const w=d.filter(x=>WIN.includes(x.replyType)).length;
+  const l=d.filter(x=>LOSS.includes(x.replyType)).length;
+  document.getElementById("st").textContent=t.toLocaleString();
+  document.getElementById("sw").textContent=w.toLocaleString();
+  document.getElementById("swr").textContent=(t?Math.round(w/t*100):0)+"%";
+  document.getElementById("sl2").textContent=l.toLocaleString();
+  document.getElementById("sub").textContent="Julia-tagged prospects · "+t.toLocaleString()+" of "+DATA.length.toLocaleString()+" replies shown";
+
+  const tm={};d.forEach(x=>{const k=x.date.slice(0,7);if(k)tm[k]=(tm[k]||0)+1;});
+  const tk=Object.keys(tm).sort();
+  dc("tl");ch.tl=new Chart(document.getElementById("c-tl"),{type:"line",data:{labels:tk.map(k=>k.slice(2)),datasets:[{label:"Replies",data:tk.map(k=>tm[k]),borderColor:"#97C459",backgroundColor:"rgba(151,196,89,0.08)",tension:0.3,pointRadius:3,fill:true}]},options:{plugins:{legend:{display:false},tooltip:TT},scales:{x:{ticks:{color:"#a0a09a",font:{size:10}},grid:{color:"rgba(255,255,255,0.04)"}},y:{ticks:{color:"#a0a09a",font:{size:10}},grid:{color:"rgba(255,255,255,0.04)"}}},responsive:true,maintainAspectRatio:true}});
+
+  const pm=gb(d,"replyType"),pl=Object.keys(pm),pv=pl.map(k=>pm[k]),pc=pl.map((t2,i)=>TC[t2]||["#97C459","#85B7EB","#FAC775","#AFA9EC","#F09595"][i%5]);
+  dc("pi");ch.pi=new Chart(document.getElementById("c-pi"),{type:"doughnut",data:{labels:pl,datasets:[{data:pv,backgroundColor:pc,borderWidth:2,borderColor:"#1c1c1a"}]},options:{plugins:{legend:{display:false},tooltip:TT},responsive:true,maintainAspectRatio:true,cutout:"60%"}});
+  document.getElementById("pl").innerHTML=pl.map((t2,i)=>'<div class="li"><div class="ld" style="background:'+pc[i]+'"></div><span>'+t2+" ("+pv[i]+")</span></div>").join("");
+
+  const wm={};d.forEach(x=>{const k=x.date.slice(0,7);if(!k)return;if(!wm[k])wm[k]={w:0,l:0};if(WIN.includes(x.replyType))wm[k].w++;if(LOSS.includes(x.replyType))wm[k].l++;});
+  const wk=Object.keys(wm).sort();
+  dc("wl");ch.wl=new Chart(document.getElementById("c-wl"),{type:"bar",data:{labels:wk.map(k=>k.slice(2)),datasets:[{label:"Wins",data:wk.map(k=>wm[k].w),backgroundColor:"#97C459",borderRadius:3},{label:"Losses",data:wk.map(k=>wm[k].l),backgroundColor:"#F09595",borderRadius:3}]},options:{plugins:{legend:{labels:{color:"#a0a09a",font:{size:11}}},tooltip:TT},scales:{x:{ticks:{color:"#a0a09a",font:{size:10}},grid:{display:false}},y:{ticks:{color:"#a0a09a",font:{size:10}},grid:{color:"rgba(255,255,255,0.04)"}}},responsive:true,maintainAspectRatio:true}});
+
+  const cm={};d.forEach(x=>{if(!cm[x.niche])cm[x.niche]={total:0,wins:0};cm[x.niche].total++;if(WIN.includes(x.replyType))cm[x.niche].wins++;});
+  const ca=Object.entries(cm).sort((a,b)=>b[1].wins-a[1].wins).slice(0,8);
+  dc("cp");ch.cp=new Chart(document.getElementById("c-cp"),{type:"bar",data:{labels:ca.map(c=>c[0].length>35?c[0].slice(0,33)+"…":c[0]),datasets:[{label:"Wins",data:ca.map(c=>c[1].wins),backgroundColor:"#97C459",borderRadius:3},{label:"Total",data:ca.map(c=>c[1].total),backgroundColor:"rgba(255,255,255,0.08)",borderRadius:3}]},options:{indexAxis:"y",plugins:{legend:{labels:{color:"#a0a09a",font:{size:11}}},tooltip:TT},scales:{x:{ticks:{color:"#a0a09a",font:{size:10}},grid:{color:"rgba(255,255,255,0.04)"}},y:{ticks:{color:"#a0a09a",font:{size:11}},grid:{display:false}}},responsive:true,maintainAspectRatio:false}});
+
+  const sm={};d.forEach(x=>{if(!sm[x.sequence])sm[x.sequence]={total:0,wins:0};sm[x.sequence].total++;if(WIN.includes(x.replyType))sm[x.sequence].wins++;});
+  const sa=Object.entries(sm).sort((a,b)=>b[1].wins-a[1].wins).slice(0,8);
+  dc("sq");ch.sq=new Chart(document.getElementById("c-sq"),{type:"bar",data:{labels:sa.map(s=>s[0]),datasets:[{label:"Wins",data:sa.map(s=>s[1].wins),backgroundColor:"#85B7EB",borderRadius:3},{label:"Total",data:sa.map(s=>s[1].total),backgroundColor:"rgba(255,255,255,0.08)",borderRadius:3}]},options:{indexAxis:"y",plugins:{legend:{labels:{color:"#a0a09a",font:{size:11}}},tooltip:TT},scales:{x:{ticks:{color:"#a0a09a",font:{size:10}},grid:{color:"rgba(255,255,255,0.04)"}},y:{ticks:{color:"#a0a09a",font:{size:11}},grid:{display:false}}},responsive:true,maintainAspectRatio:false}});
+
+  const om=gb(d,"company"),oa=Object.entries(om).sort((a,b)=>b[1]-a[1]).slice(0,10);
+  dc("co");ch.co=new Chart(document.getElementById("c-co"),{type:"bar",data:{labels:oa.map(c=>c[0]),datasets:[{label:"Replies",data:oa.map(c=>c[1]),backgroundColor:"#AFA9EC",borderRadius:3}]},options:{indexAxis:"y",plugins:{legend:{display:false},tooltip:TT},scales:{x:{ticks:{color:"#a0a09a",font:{size:10}},grid:{color:"rgba(255,255,255,0.04)"}},y:{ticks:{color:"#a0a09a",font:{size:11}},grid:{display:false}}},responsive:true,maintainAspectRatio:false}});
+}
+
+document.querySelectorAll(".tab").forEach(t=>{
+  t.onclick=()=>{
+    document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));
+    document.querySelectorAll(".tc").forEach(x=>x.classList.remove("active"));
+    t.classList.add("active");
+    document.getElementById(t.dataset.tab).classList.add("active");
+  };
+});
+
+fetchData();
+</script>
+</body>
+</html>
