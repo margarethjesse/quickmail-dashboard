@@ -45,7 +45,7 @@
   .yb { padding: 5px 12px; border-radius: var(--radius); font-size: 12px; cursor: pointer; background: var(--bg2); color: var(--text2); border: 0.5px solid var(--border); user-select: none; display: inline-block; margin-right: 4px; }
   .yb.active { background: var(--green-dark); color: #fff; border-color: var(--green-dark); }
 
-  .stats { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; margin-bottom: 20px; }
+  .stats { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; margin-bottom: 20px; }
   .stat { background: var(--bg); border: 0.5px solid var(--border); border-radius: var(--radius-lg); padding: 14px 16px; }
   .sl { font-size: 12px; color: var(--text2); margin-bottom: 6px; }
   .sv { font-size: 26px; font-weight: 600; }
@@ -64,6 +64,14 @@
   .leg { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
   .li { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--text2); }
   .ld { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+
+  .tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .tbl th { text-align: left; padding: 8px 12px; font-size: 11px; font-weight: 500; color: var(--text2); border-bottom: 1px solid var(--border); white-space: nowrap; }
+  .tbl th.r, .tbl td.r { text-align: right; }
+  .tbl td { padding: 9px 12px; border-bottom: 0.5px solid var(--border); color: var(--text); }
+  .tbl tr:last-child td { border-bottom: none; }
+  .tbl tr:hover td { background: rgba(255,255,255,0.02); }
+  .rate-g { color: var(--green); } .rate-r { color: var(--red); }
 
   @media(max-width:700px) {
     .stats { grid-template-columns: repeat(2,1fr); }
@@ -109,6 +117,8 @@
 
     <div class="stats">
       <div class="stat"><div class="sl">Total replies</div><div class="sv" id="st">—</div><div class="ss">in selected range</div></div>
+      <div class="stat"><div class="sl">Positive replies</div><div class="sv g" id="spos">—</div><div class="ss">column J flagged</div></div>
+      <div class="stat"><div class="sl">Negative replies</div><div class="sv r" id="sneg">—</div><div class="ss">column K flagged</div></div>
       <div class="stat"><div class="sl">Wins</div><div class="sv g" id="sw">—</div><div class="ss">interested + booking</div></div>
       <div class="stat"><div class="sl">Win rate</div><div class="sv" id="swr">—</div><div class="ss">of all replies</div></div>
       <div class="stat"><div class="sl">Losses</div><div class="sv r" id="sl2">—</div><div class="ss">not interested + unsub</div></div>
@@ -117,8 +127,6 @@
     <div class="tabs">
       <div class="tab active" data-tab="ov">Overview</div>
       <div class="tab" data-tab="cp">Campaigns</div>
-      <div class="tab" data-tab="sq">Sequences</div>
-      <div class="tab" data-tab="co">Companies</div>
     </div>
 
     <div id="ov" class="tc active">
@@ -128,9 +136,21 @@
         <div class="card full"><div class="ct">Win / loss ratio over time</div><canvas id="c-wl" height="160"></canvas></div>
       </div>
     </div>
-    <div id="cp" class="tc"><div class="card"><div class="ct">Top campaigns by wins</div><canvas id="c-cp" height="300"></canvas></div></div>
-    <div id="sq" class="tc"><div class="card"><div class="ct">Top sequences by wins</div><canvas id="c-sq" height="300"></canvas></div></div>
-    <div id="co" class="tc"><div class="card"><div class="ct">Reply volume by company</div><canvas id="c-co" height="300"></canvas></div></div>
+    <div id="cp" class="tc">
+      <div class="card">
+        <div class="ct">Campaigns</div>
+        <table class="tbl" id="cp-tbl">
+          <thead><tr>
+            <th>Campaign</th>
+            <th class="r">Total</th>
+            <th class="r">Positive</th>
+            <th class="r">Negative</th>
+            <th class="r">Positive rate</th>
+          </tr></thead>
+          <tbody id="cp-body"></tbody>
+        </table>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -159,20 +179,26 @@ async function fetchData() {
         for (let i = 0; i < Math.min(5, rows.length); i++) {
           if (rows[i].some(c => /campaign|niche|prospect email/i.test(String(c)))) { hi = i; break; }
         }
-        const hdr = rows[hi].map(h => String(h).toLowerCase().trim());
-        const col = n => hdr.findIndex(h => h.includes(n));
-        const iN = col("niche") !== -1 ? col("niche") : col("campaign");
-        const iE = col("prospect email") !== -1 ? col("prospect email") : col("email");
-        const iT = col("job title") !== -1 ? col("job title") : col("job");
-        const iD = col("date replied") !== -1 ? col("date replied") : col("date");
-        const iS = col("email sequence") !== -1 ? col("email sequence") : col("sequence");
-        const iC = col("company");
-        const iB = col("full reply") !== -1 ? col("full reply") : col("reply body") !== -1 ? col("reply body") : col("body");
-        const iR = col("reply type") !== -1 ? col("reply type") : col("type");
+        // Fixed column indices: A=Campaign Name, B=Niche, C=Prospect Email, D=Job Title,
+        // E=Date Replied, F=Email Sequence, G=Company Name, H=Full Reply Body,
+        // I=Email Sent Before Reply, J=Positive Response, K=Negative Response,
+        // L=Reply Type, M=Scraped At
+        const iA = 0;   // A: Campaign Name
+        const iN = 1;   // B: Niche
+        const iE = 2;   // C: Prospect Email
+        const iT = 3;   // D: Job Title
+        const iD = 4;   // E: Date Replied
+        const iS = 5;   // F: Email Sequence
+        const iC = 6;   // G: Company Name
+        const iB = 7;   // H: Full Reply Body
+        const iPOS = 9; // J: Positive Response
+        const iNEG = 10;// K: Negative Response
+        const iR = 11;  // L: Reply Type
 
         DATA = rows.slice(hi + 1)
           .filter(r => r[iD] && String(r[iD]).match(/\d{4}/))
           .map(r => ({
+            campaign:  String(r[iA]||"").trim(),
             niche:     String(r[iN]||"").trim(),
             email:     String(r[iE]||"").trim(),
             title:     String(r[iT]||"").trim(),
@@ -180,6 +206,8 @@ async function fetchData() {
             sequence:  String(r[iS]||"").trim(),
             company:   String(r[iC]||"").trim(),
             body:      String(r[iB]||"").trim(),
+            pos:       String(r[iPOS]||"").trim(),
+            neg:       String(r[iNEG]||"").trim(),
             replyType: String(r[iR]||"").trim().toLowerCase(),
           }))
           .filter(r => r.date.match(/^\d{4}-\d{2}-\d{2}/));
@@ -239,11 +267,17 @@ function gf(){
 function gb(arr,k){const m={};arr.forEach(d=>{const v=d[k]||"(none)";m[v]=(m[v]||0)+1;});return m;}
 function dc(id){if(ch[id]){ch[id].destroy();delete ch[id];}}
 
+function isFlagged(v){const s=v.toLowerCase();return v!==""&&s!=="0"&&s!=="false"&&s!=="no";}
+
 function render(){
   const d=gf(), t=d.length;
   const w=d.filter(x=>WIN.includes(x.replyType)).length;
   const l=d.filter(x=>LOSS.includes(x.replyType)).length;
+  const pos=d.filter(x=>isFlagged(x.pos)).length;
+  const neg=d.filter(x=>isFlagged(x.neg)).length;
   document.getElementById("st").textContent=t.toLocaleString();
+  document.getElementById("spos").textContent=pos.toLocaleString();
+  document.getElementById("sneg").textContent=neg.toLocaleString();
   document.getElementById("sw").textContent=w.toLocaleString();
   document.getElementById("swr").textContent=(t?Math.round(w/t*100):0)+"%";
   document.getElementById("sl2").textContent=l.toLocaleString();
@@ -261,16 +295,20 @@ function render(){
   const wk=Object.keys(wm).sort();
   dc("wl");ch.wl=new Chart(document.getElementById("c-wl"),{type:"bar",data:{labels:wk.map(k=>k.slice(2)),datasets:[{label:"Wins",data:wk.map(k=>wm[k].w),backgroundColor:"#97C459",borderRadius:3},{label:"Losses",data:wk.map(k=>wm[k].l),backgroundColor:"#F09595",borderRadius:3}]},options:{plugins:{legend:{labels:{color:"#a0a09a",font:{size:11}}},tooltip:TT},scales:{x:{ticks:{color:"#a0a09a",font:{size:10}},grid:{display:false}},y:{ticks:{color:"#a0a09a",font:{size:10}},grid:{color:"rgba(255,255,255,0.04)"}}},responsive:true,maintainAspectRatio:true}});
 
-  const cm={};d.forEach(x=>{if(!cm[x.niche])cm[x.niche]={total:0,wins:0};cm[x.niche].total++;if(WIN.includes(x.replyType))cm[x.niche].wins++;});
-  const ca=Object.entries(cm).sort((a,b)=>b[1].wins-a[1].wins).slice(0,8);
-  dc("cp");ch.cp=new Chart(document.getElementById("c-cp"),{type:"bar",data:{labels:ca.map(c=>c[0].length>35?c[0].slice(0,33)+"…":c[0]),datasets:[{label:"Wins",data:ca.map(c=>c[1].wins),backgroundColor:"#97C459",borderRadius:3},{label:"Total",data:ca.map(c=>c[1].total),backgroundColor:"rgba(255,255,255,0.08)",borderRadius:3}]},options:{indexAxis:"y",plugins:{legend:{labels:{color:"#a0a09a",font:{size:11}}},tooltip:TT},scales:{x:{ticks:{color:"#a0a09a",font:{size:10}},grid:{color:"rgba(255,255,255,0.04)"}},y:{ticks:{color:"#a0a09a",font:{size:11}},grid:{display:false}}},responsive:true,maintainAspectRatio:false}});
-
-  const sm={};d.forEach(x=>{if(!sm[x.sequence])sm[x.sequence]={total:0,wins:0};sm[x.sequence].total++;if(WIN.includes(x.replyType))sm[x.sequence].wins++;});
-  const sa=Object.entries(sm).sort((a,b)=>b[1].wins-a[1].wins).slice(0,8);
-  dc("sq");ch.sq=new Chart(document.getElementById("c-sq"),{type:"bar",data:{labels:sa.map(s=>s[0]),datasets:[{label:"Wins",data:sa.map(s=>s[1].wins),backgroundColor:"#85B7EB",borderRadius:3},{label:"Total",data:sa.map(s=>s[1].total),backgroundColor:"rgba(255,255,255,0.08)",borderRadius:3}]},options:{indexAxis:"y",plugins:{legend:{labels:{color:"#a0a09a",font:{size:11}}},tooltip:TT},scales:{x:{ticks:{color:"#a0a09a",font:{size:10}},grid:{color:"rgba(255,255,255,0.04)"}},y:{ticks:{color:"#a0a09a",font:{size:11}},grid:{display:false}}},responsive:true,maintainAspectRatio:false}});
-
-  const om=gb(d,"company"),oa=Object.entries(om).sort((a,b)=>b[1]-a[1]).slice(0,10);
-  dc("co");ch.co=new Chart(document.getElementById("c-co"),{type:"bar",data:{labels:oa.map(c=>c[0]),datasets:[{label:"Replies",data:oa.map(c=>c[1]),backgroundColor:"#AFA9EC",borderRadius:3}]},options:{indexAxis:"y",plugins:{legend:{display:false},tooltip:TT},scales:{x:{ticks:{color:"#a0a09a",font:{size:10}},grid:{color:"rgba(255,255,255,0.04)"}},y:{ticks:{color:"#a0a09a",font:{size:11}},grid:{display:false}}},responsive:true,maintainAspectRatio:false}});
+  const cm={};
+  d.forEach(x=>{
+    const k=x.campaign||"(none)";
+    if(!cm[k])cm[k]={total:0,pos:0,neg:0};
+    cm[k].total++;
+    if(isFlagged(x.pos))cm[k].pos++;
+    if(isFlagged(x.neg))cm[k].neg++;
+  });
+  const ca=Object.entries(cm).sort((a,b)=>b[1].total-a[1].total);
+  document.getElementById("cp-body").innerHTML=ca.map(([name,v])=>{
+    const rate=v.total?Math.round(v.pos/v.total*100):0;
+    const rc=rate>=50?"rate-g":rate>0?"":"rate-r";
+    return '<tr><td>'+(name.length>50?name.slice(0,48)+"…":name)+'</td><td class="r">'+v.total+'</td><td class="r" style="color:var(--green)">'+v.pos+'</td><td class="r" style="color:var(--red)">'+v.neg+'</td><td class="r '+rc+'">'+rate+'%</td></tr>';
+  }).join("");
 }
 
 document.querySelectorAll(".tab").forEach(t=>{
