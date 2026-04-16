@@ -183,17 +183,17 @@ async function fetchData() {
         // E=Date Replied, F=Email Sequence, G=Company Name, H=Full Reply Body,
         // I=Email Sent Before Reply, J=Positive Response, K=Negative Response,
         // L=Reply Type, M=Scraped At
-        const iA = 0;   // A: Campaign Name
-        const iN = 1;   // B: Niche
+        const iN = 0;   // A: Niche
+        const iA = 1;   // B: Campaign Name (header: "Campaign Name (Niche)")
         const iE = 2;   // C: Prospect Email
         const iT = 3;   // D: Job Title
         const iD = 4;   // E: Date Replied
-        const iS = 5;   // F: Email Sequence
+        const iS = 5;   // F: Email Sequence Name
         const iC = 6;   // G: Company Name
         const iB = 7;   // H: Full Reply Body
-        const iPOS = 9; // J: Positive Response
-        const iNEG = 10;// K: Negative Response
-        const iR = 11;  // L: Reply Type
+        const iR = 8;   // I: Reply Type
+        const iPOS = 9; // J: Positive Response (checking for "Yes")
+        const iNEG = 10;// K: Negative Response (checking for "Yes")
 
         DATA = rows.slice(hi + 1)
           .filter(r => r[iD] && String(r[iD]).match(/\d{4}/))
@@ -267,7 +267,7 @@ function gf(){
 function gb(arr,k){const m={};arr.forEach(d=>{const v=d[k]||"(none)";m[v]=(m[v]||0)+1;});return m;}
 function dc(id){if(ch[id]){ch[id].destroy();delete ch[id];}}
 
-function isFlagged(v){const s=v.toLowerCase();return v!==""&&s!=="0"&&s!=="false"&&s!=="no";}
+function isFlagged(v){return v.toLowerCase()==="yes";}
 
 function render(){
   const d=gf(), t=d.length;
