@@ -132,7 +132,7 @@
     <div id="ov" class="tc active">
       <div class="g2">
         <div class="card"><div class="ct">Replies over time</div><canvas id="c-tl" height="180"></canvas></div>
-        <div class="card"><div class="ct">Reply type breakdown</div><canvas id="c-pi" height="180"></canvas><div class="leg" id="pl"></div></div>
+        <div class="card"><div class="ct">Positive vs Negative</div><canvas id="c-pi" height="180"></canvas><div class="leg" id="pl"></div></div>
         <div class="card full"><div class="ct">Win / loss ratio over time</div><canvas id="c-wl" height="160"></canvas></div>
       </div>
     </div>
@@ -183,17 +183,17 @@ async function fetchData() {
         // E=Date Replied, F=Email Sequence, G=Company Name, H=Full Reply Body,
         // I=Email Sent Before Reply, J=Positive Response, K=Negative Response,
         // L=Reply Type, M=Scraped At
-        const iN = 0;   // A: Niche
-        const iA = 1;   // B: Campaign Name (header: "Campaign Name (Niche)")
+        const iA = 0;   // A: Campaign Name
+        const iN = 1;   // B: Niche
         const iE = 2;   // C: Prospect Email
         const iT = 3;   // D: Job Title
         const iD = 4;   // E: Date Replied
         const iS = 5;   // F: Email Sequence Name
         const iC = 6;   // G: Company Name
         const iB = 7;   // H: Full Reply Body
-        const iR = 8;   // I: Reply Type
-        const iPOS = 9; // J: Positive Response (checking for "Yes")
-        const iNEG = 10;// K: Negative Response (checking for "Yes")
+        const iPOS = 9; // J: Positive Response ("Yes"/"No")
+        const iNEG = 10;// K: Negative Response ("Yes"/"No")
+        const iR = 11;  // L: Reply Type
 
         DATA = rows.slice(hi + 1)
           .filter(r => r[iD] && String(r[iD]).match(/\d{4}/))
@@ -287,7 +287,8 @@ function render(){
   const tk=Object.keys(tm).sort();
   dc("tl");ch.tl=new Chart(document.getElementById("c-tl"),{type:"line",data:{labels:tk.map(k=>k.slice(2)),datasets:[{label:"Replies",data:tk.map(k=>tm[k]),borderColor:"#97C459",backgroundColor:"rgba(151,196,89,0.08)",tension:0.3,pointRadius:3,fill:true}]},options:{plugins:{legend:{display:false},tooltip:TT},scales:{x:{ticks:{color:"#a0a09a",font:{size:10}},grid:{color:"rgba(255,255,255,0.04)"}},y:{ticks:{color:"#a0a09a",font:{size:10}},grid:{color:"rgba(255,255,255,0.04)"}}},responsive:true,maintainAspectRatio:true}});
 
-  const pm=gb(d,"replyType"),pl=Object.keys(pm),pv=pl.map(k=>pm[k]),pc=pl.map((t2,i)=>TC[t2]||["#97C459","#85B7EB","#FAC775","#AFA9EC","#F09595"][i%5]);
+  const neutral=t-pos-neg;
+  const pl=["Positive","Negative","Neutral"],pv=[pos,neg,neutral],pc=["#97C459","#F09595","#606060"];
   dc("pi");ch.pi=new Chart(document.getElementById("c-pi"),{type:"doughnut",data:{labels:pl,datasets:[{data:pv,backgroundColor:pc,borderWidth:2,borderColor:"#1c1c1a"}]},options:{plugins:{legend:{display:false},tooltip:TT},responsive:true,maintainAspectRatio:true,cutout:"60%"}});
   document.getElementById("pl").innerHTML=pl.map((t2,i)=>'<div class="li"><div class="ld" style="background:'+pc[i]+'"></div><span>'+t2+" ("+pv[i]+")</span></div>").join("");
 
