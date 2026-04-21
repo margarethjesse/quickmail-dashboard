@@ -134,6 +134,7 @@
         <div class="card"><div class="ct">Replies over time</div><canvas id="c-tl" height="180"></canvas></div>
         <div class="card"><div class="ct">Positive vs Negative</div><canvas id="c-pi" height="180"></canvas><div class="leg" id="pl"></div></div>
         <div class="card full"><div class="ct">Win / loss ratio over time</div><canvas id="c-wl" height="160"></canvas></div>
+        <div class="card full"><div class="ct">Replies by Niche</div><canvas id="c-nb" height="200"></canvas></div>
       </div>
     </div>
     <div id="cp" class="tc">
@@ -294,6 +295,10 @@ function render(){
   const wm={};d.forEach(x=>{const k=x.date.slice(0,7);if(!k)return;if(!wm[k])wm[k]={w:0,l:0};if(WIN.includes(x.replyType))wm[k].w++;if(LOSS.includes(x.replyType))wm[k].l++;});
   const wk=Object.keys(wm).sort();
   dc("wl");ch.wl=new Chart(document.getElementById("c-wl"),{type:"bar",data:{labels:wk.map(k=>k.slice(2)),datasets:[{label:"Wins",data:wk.map(k=>wm[k].w),backgroundColor:"#97C459",borderRadius:3},{label:"Losses",data:wk.map(k=>wm[k].l),backgroundColor:"#F09595",borderRadius:3}]},options:{plugins:{legend:{labels:{color:"#a0a09a",font:{size:11}}},tooltip:TT},scales:{x:{ticks:{color:"#a0a09a",font:{size:10}},grid:{display:false}},y:{ticks:{color:"#a0a09a",font:{size:10}},grid:{color:"rgba(255,255,255,0.04)"}}},responsive:true,maintainAspectRatio:true}});
+
+  const nm={};d.forEach(x=>{const k=x.niche||"(none)";if(!nm[k])nm[k]={pos:0,neg:0,total:0};nm[k].total++;if(isFlagged(x.pos))nm[k].pos++;if(isFlagged(x.neg))nm[k].neg++;});
+  const na=Object.entries(nm).sort((a,b)=>b[1].total-a[1].total);
+  dc("nb");ch.nb=new Chart(document.getElementById("c-nb"),{type:"bar",data:{labels:na.map(([k])=>k),datasets:[{label:"Positive",data:na.map(([,v])=>v.pos),backgroundColor:"#97C459",borderRadius:3},{label:"Negative",data:na.map(([,v])=>v.neg),backgroundColor:"#F09595",borderRadius:3}]},options:{plugins:{legend:{labels:{color:"#a0a09a",font:{size:11}}},tooltip:TT},scales:{x:{ticks:{color:"#a0a09a",font:{size:10}},grid:{display:false}},y:{ticks:{color:"#a0a09a",font:{size:10}},grid:{color:"rgba(255,255,255,0.04)"}}},responsive:true,maintainAspectRatio:true}});
 
   const cm={};
   d.forEach(x=>{
