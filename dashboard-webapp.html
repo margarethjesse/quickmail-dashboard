@@ -135,7 +135,7 @@
         <div class="card"><div class="ct">Positive vs Negative</div><canvas id="c-pi" height="180"></canvas><div class="leg" id="pl"></div></div>
         <div class="card full"><div class="ct">Win / loss ratio over time</div><canvas id="c-wl" height="160"></canvas></div>
         <div class="card full"><div class="ct">Replies by Niche</div><canvas id="c-nb" height="200"></canvas></div>
-        <div class="card full"><div class="ct">Weekly Overview</div><canvas id="c-wov" height="200"></canvas></div>
+        <div class="card full"><div class="ct" style="display:flex;align-items:center;justify-content:space-between"><span>Weekly Overview</span><select id="wov-month"></select></div><canvas id="c-wov" height="200"></canvas></div>
         <div class="card full"><div class="ct">Monthly Overview</div><canvas id="c-mov" height="200"></canvas></div>
       </div>
     </div>
@@ -162,7 +162,7 @@ const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT7PNMD-7yUtwEj
 const WIN=["interested","booking request"], LOSS=["not interested","unsubscribe request"];
 const TC={"interested":"#97C459","not interested":"#F09595","wants more information":"#FAC775","booking request":"#85B7EB","unsubscribe request":"#606060"};
 const TT={backgroundColor:"#252523",borderColor:"rgba(255,255,255,0.1)",borderWidth:1,titleColor:"#f0ede8",bodyColor:"#a0a09a",padding:10,titleFont:{size:12},bodyFont:{size:11}};
-let DATA=[], ch={}, ay="All", uc=false;
+let DATA=[], ch={}, ay="All", uc=false, wovMonth=null;
 
 async function fetchData() {
   document.getElementById("loading").style.display="flex";
@@ -272,6 +272,9 @@ function dc(id){if(ch[id]){ch[id].destroy();delete ch[id];}}
 
 function isFlagged(v){return v.toLowerCase()==="yes";}
 
+const MN=["January","February","March","April","May","June","July","August","September","October","November","December"];
+function fmtMonth(ym){const[y,m]=ym.split("-");return MN[+m-1]+" "+y;}
+
 function weekKey(s){const d=new Date(s+"T00:00:00"),day=d.getDay()||7,t=new Date(d);t.setDate(d.getDate()+4-day);const y=t.getFullYear(),j=new Date(y,0,1),w=Math.ceil(((t-j)/864e5+1)/7);return y+"-W"+String(w).padStart(2,"0");}
 
 function buildOv(cid,d,kfn,lfn){
@@ -315,7 +318,15 @@ function render(){
   const na=Object.entries(nm).sort((a,b)=>b[1].total-a[1].total);
   dc("nb");ch.nb=new Chart(document.getElementById("c-nb"),{type:"bar",data:{labels:na.map(([k])=>k),datasets:[{label:"Positive",data:na.map(([,v])=>v.pos),backgroundColor:"#97C459",borderRadius:3},{label:"Negative",data:na.map(([,v])=>v.neg),backgroundColor:"#F09595",borderRadius:3}]},options:{plugins:{legend:{labels:{color:"#a0a09a",font:{size:11}}},tooltip:TT},scales:{x:{ticks:{color:"#a0a09a",font:{size:10}},grid:{display:false}},y:{ticks:{color:"#a0a09a",font:{size:10}},grid:{color:"rgba(255,255,255,0.04)"}}},responsive:true,maintainAspectRatio:true}});
 
-  buildOv("wov",d,x=>weekKey(x.date),k=>k.replace(/^\d{4}-/,""));
+  const wovMths=[...new Set(d.map(x=>x.date.slice(0,7)).filter(Boolean))].sort().reverse();
+  const wovSel=document.getElementById("wov-month");
+  const prevWov=wovMonth||wovSel.value;
+  wovSel.innerHTML=wovMths.map(m=>'<option value="'+m+'">'+fmtMonth(m)+"</option>").join("");
+  wovMonth=wovMths.includes(prevWov)?prevWov:(wovMths[0]||"");
+  wovSel.value=wovMonth;
+  const renderWov=()=>{const wd=d.filter(x=>x.date.startsWith(wovMonth));buildOv("wov",wd,x=>weekKey(x.date),k=>k.replace(/^\d{4}-/,""));};
+  wovSel.onchange=()=>{wovMonth=wovSel.value;renderWov();};
+  renderWov();
   buildOv("mov",d,x=>x.date.slice(0,7),k=>k.slice(2));
 
   const cm={};
