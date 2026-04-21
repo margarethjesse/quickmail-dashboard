@@ -287,8 +287,7 @@ function render(){
   const tk=Object.keys(tm).sort();
   dc("tl");ch.tl=new Chart(document.getElementById("c-tl"),{type:"line",data:{labels:tk.map(k=>k.slice(2)),datasets:[{label:"Replies",data:tk.map(k=>tm[k]),borderColor:"#97C459",backgroundColor:"rgba(151,196,89,0.08)",tension:0.3,pointRadius:3,fill:true}]},options:{plugins:{legend:{display:false},tooltip:TT},scales:{x:{ticks:{color:"#a0a09a",font:{size:10}},grid:{color:"rgba(255,255,255,0.04)"}},y:{ticks:{color:"#a0a09a",font:{size:10}},grid:{color:"rgba(255,255,255,0.04)"}}},responsive:true,maintainAspectRatio:true}});
 
-  const neutral=t-pos-neg;
-  const pl=["Positive","Negative","Neutral"],pv=[pos,neg,neutral],pc=["#97C459","#F09595","#606060"];
+  const pl=["Positive","Negative"],pv=[pos,neg],pc=["#97C459","#F09595"];
   dc("pi");ch.pi=new Chart(document.getElementById("c-pi"),{type:"doughnut",data:{labels:pl,datasets:[{data:pv,backgroundColor:pc,borderWidth:2,borderColor:"#1c1c1a"}]},options:{plugins:{legend:{display:false},tooltip:TT},responsive:true,maintainAspectRatio:true,cutout:"60%"}});
   document.getElementById("pl").innerHTML=pl.map((t2,i)=>'<div class="li"><div class="ld" style="background:'+pc[i]+'"></div><span>'+t2+" ("+pv[i]+")</span></div>").join("");
 
