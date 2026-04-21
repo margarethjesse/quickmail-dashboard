@@ -135,6 +135,8 @@
         <div class="card"><div class="ct">Positive vs Negative</div><canvas id="c-pi" height="180"></canvas><div class="leg" id="pl"></div></div>
         <div class="card full"><div class="ct">Win / loss ratio over time</div><canvas id="c-wl" height="160"></canvas></div>
         <div class="card full"><div class="ct">Replies by Niche</div><canvas id="c-nb" height="200"></canvas></div>
+        <div class="card full"><div class="ct">Weekly Overview</div><canvas id="c-wov" height="200"></canvas></div>
+        <div class="card full"><div class="ct">Monthly Overview</div><canvas id="c-mov" height="200"></canvas></div>
       </div>
     </div>
     <div id="cp" class="tc">
@@ -270,6 +272,19 @@ function dc(id){if(ch[id]){ch[id].destroy();delete ch[id];}}
 
 function isFlagged(v){return v.toLowerCase()==="yes";}
 
+function weekKey(s){const d=new Date(s+"T00:00:00"),day=d.getDay()||7,t=new Date(d);t.setDate(d.getDate()+4-day);const y=t.getFullYear(),j=new Date(y,0,1),w=Math.ceil(((t-j)/864e5+1)/7);return y+"-W"+String(w).padStart(2,"0");}
+
+function buildOv(cid,d,kfn,lfn){
+  const m={};d.forEach(x=>{const k=kfn(x);if(!k)return;if(!m[k])m[k]={pos:0,neg:0,unk:0};if(isFlagged(x.pos))m[k].pos++;else if(isFlagged(x.neg))m[k].neg++;else m[k].unk++;});
+  const ks=Object.keys(m).sort(),pd=ks.map(k=>m[k].pos),nd=ks.map(k=>m[k].neg),ud=ks.map(k=>m[k].unk);
+  dc(cid);ch[cid]=new Chart(document.getElementById("c-"+cid),{type:"bar",data:{labels:ks.map(lfn),datasets:[
+    {label:"Positive",data:pd,backgroundColor:"#97C459",stack:"s",order:2,borderRadius:2},
+    {label:"Negative",data:nd,backgroundColor:"#F09595",stack:"s",order:2,borderRadius:2},
+    {label:"Unknown",data:ud,backgroundColor:"#606060",stack:"s",order:2,borderRadius:2},
+    {type:"line",label:"_pos_line",data:pd,borderColor:"#97C459",backgroundColor:"rgba(151,196,89,0.12)",tension:0.3,pointRadius:4,order:1,fill:false,borderWidth:2,pointBackgroundColor:"#97C459"}
+  ]},options:{plugins:{legend:{labels:{color:"#a0a09a",font:{size:11},filter:i=>i.text!=="_pos_line"}},tooltip:TT},scales:{x:{stacked:true,ticks:{color:"#a0a09a",font:{size:10}},grid:{display:false}},y:{stacked:true,ticks:{color:"#a0a09a",font:{size:10}},grid:{color:"rgba(255,255,255,0.04)"}}},responsive:true,maintainAspectRatio:true}});
+}
+
 function render(){
   const d=gf(), t=d.length;
   const w=d.filter(x=>WIN.includes(x.replyType)).length;
@@ -299,6 +314,9 @@ function render(){
   const nm={};d.forEach(x=>{const k=x.niche||"(none)";if(!nm[k])nm[k]={pos:0,neg:0,total:0};nm[k].total++;if(isFlagged(x.pos))nm[k].pos++;if(isFlagged(x.neg))nm[k].neg++;});
   const na=Object.entries(nm).sort((a,b)=>b[1].total-a[1].total);
   dc("nb");ch.nb=new Chart(document.getElementById("c-nb"),{type:"bar",data:{labels:na.map(([k])=>k),datasets:[{label:"Positive",data:na.map(([,v])=>v.pos),backgroundColor:"#97C459",borderRadius:3},{label:"Negative",data:na.map(([,v])=>v.neg),backgroundColor:"#F09595",borderRadius:3}]},options:{plugins:{legend:{labels:{color:"#a0a09a",font:{size:11}}},tooltip:TT},scales:{x:{ticks:{color:"#a0a09a",font:{size:10}},grid:{display:false}},y:{ticks:{color:"#a0a09a",font:{size:10}},grid:{color:"rgba(255,255,255,0.04)"}}},responsive:true,maintainAspectRatio:true}});
+
+  buildOv("wov",d,x=>weekKey(x.date),k=>k.replace(/^\d{4}-/,""));
+  buildOv("mov",d,x=>x.date.slice(0,7),k=>k.slice(2));
 
   const cm={};
   d.forEach(x=>{
